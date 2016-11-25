@@ -13,6 +13,8 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 
+int debug;
+
 // either call with a pre-allocated 
 //   char dev[IFNAMSIZ]
 // set to the preferred dev name and it will be replaced with the allotted name
@@ -55,6 +57,28 @@ int create_tun(char* dev) {
   return fd;
 }
 
+
+int set_mtu(int mtu) {
+
+  /*
+  struct ifreq ifr; 
+  int sock;
+  
+  if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    return -1;
+  }
+  
+  
+  ifr.ifr_addr.sa_family = AF_INET;
+  strncpy(ifr.ifr_name, iap->ifa_name, sizeof(ifr.ifr_name));
+
+  ifr.ifr_mtu = mtu; 
+
+  ioctl(s, SIOCSIFMTU, (caddr_t)&ifr);
+
+  close(sock);
+  */
+}
 
 // baud is specified using macros
 // e.g. 9600 is B9600
@@ -121,9 +145,13 @@ int event_loop(int fds, int fdi) {
 }
 
 
+void usage(FILE* out, char* name) {
+  fprintf(out, "Usage: %s\n", name);
+}
 
 
-int main() {
+int main(int argc, char* argv[]) {
+  int opt;
 
   char serial_dev[] = "/dev/ttyS0";
   speed_t serial_speed = B9600;
@@ -133,6 +161,19 @@ int main() {
   int fds; // serial fd
   int fdi; // interface fd
 
+  while((opt = getopt(argc, argv, "d")) > 0) {
+    switch(opt) {
+      case 'd':
+        debug = 1;
+        break;
+      default:
+        usage(stderr, argv[0]);
+        return 1;
+    }
+  }
+
+  argv += optind;
+  argc -= optind;
 
   // TODO check if we are simply talking to an existing uclient
   // and call send_uclient_msg accordingly
