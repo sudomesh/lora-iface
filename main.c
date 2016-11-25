@@ -100,6 +100,8 @@ int event_loop(int fds, int fdi) {
 
     maxfd = (fds > fdi) ? fds : fdi;
 
+    maxfd = add_uclients_to_fd_set(&fdset, maxfd);
+
     ret = select(maxfd + 1, &fdset, NULL, NULL, NULL);
     if(ret < 0){
       if(errno == EINTR) {
@@ -110,7 +112,10 @@ int event_loop(int fds, int fdi) {
       }
     }
 
-    
+    handle_uclient_connections(&fdset);
+
+    // TODO actually read and write between sockets
+
 
   }
 }
@@ -124,8 +129,15 @@ int main() {
   speed_t serial_speed = B9600;
   char iface_name[IFNAMSIZ] = "lora";
 
+  int ret;
   int fds; // serial fd
   int fdi; // interface fd
+
+
+  // TODO check if we are simply talking to an existing uclient
+  // and call send_uclient_msg accordingly
+  //ret = send_uclient_msg('i', NULL, 1);
+
 
   fds = open_serial(serial_dev, serial_speed);
   if(fds < 0) {
@@ -138,8 +150,12 @@ int main() {
     return fdi;
   }
 
+  open_ipc_socket();
 
-
+  ret = event_loop(fds, fdi);
+  if(ret < 0) {
+    return ret;
+  }
 
   return 0;
 }
