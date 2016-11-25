@@ -13,6 +13,7 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 
+
 int debug;
 
 // either call with a pre-allocated 
@@ -138,9 +139,16 @@ int event_loop(int fds, int fdi) {
 
     handle_uclient_connections(&fdset);
 
-    // TODO actually read and write between sockets
+    // handle data on serial device
+    if(FD_ISSET(fds, &fdset)) {
+      // TODO
+    }
 
-
+    
+    // handle data on network interface
+    if(FD_ISSET(fdi, &fdset)) {
+      // TODO
+    }
   }
 }
 
@@ -160,6 +168,8 @@ int main(int argc, char* argv[]) {
   int ret;
   int fds; // serial fd
   int fdi; // interface fd
+
+  debug = 0;
 
   while((opt = getopt(argc, argv, "d")) > 0) {
     switch(opt) {

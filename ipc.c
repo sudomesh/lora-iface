@@ -12,8 +12,9 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <sys/un.h>
-
 #include "ipc.h"
+
+extern int debug;
 
 char* socket_file = "/tmp/lora_iface.sock";
 
