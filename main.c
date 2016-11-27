@@ -141,9 +141,10 @@ int event_loop(int fds, int fdi) {
 
     // handle incoming data on serial device
     if(FD_ISSET(fds, &fdset)) {
-      
-      // TODO transmit on fdi
-
+      ret = rn2903_receive(fds, fdi);
+      if(ret < 0) {
+        return ret;
+      }
     }
 
     // handle incoming data on network interface
@@ -195,7 +196,6 @@ int main(int argc, char* argv[]) {
   // TODO check if we are simply talking to an existing uclient
   // and call send_uclient_msg accordingly
   //ret = send_uclient_msg('i', NULL, 1);
-
 
   fds = open_serial(serial_dev, serial_speed);
   if(fds < 0) {

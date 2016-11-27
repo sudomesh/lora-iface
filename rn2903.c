@@ -6,21 +6,29 @@
 
 #include "rn2903.h"
 
-/*
-typedef enum {
-  SYS_RESET,
-  SYS_VER
-} cmd_type;
 
-cmd_type last_cmd;
-*/
+#define RECEIVE_BUFFER_SIZE 8192
+
+char rbuf[RECEIVE_BUFFER_SIZE];
+size_t rbuf_len = 0;
 
 int (*recv_cb)(char*, size_t) = NULL;
+
+int recv_cb_default(char* buf, size_t len) {
+  fprintf(stdout, "Got unexpected data: %s\n", buf);
+  return 0;
+}
 
 int rn2903_cmd(int fds, char* buf, size_t len, int (*cb)(char*, size_t)) {
   ssize_t sent;
   ssize_t ret;
   const char crlf[] = "\r\n";
+
+  // TODO queue command if a command is already processing
+  if(recv_cb) {
+    return -1;
+  }
+  recv_cb = cb;
 
   char* to_send = malloc(len + 2);
   if(!to_send) {
@@ -42,15 +50,104 @@ int rn2903_cmd(int fds, char* buf, size_t len, int (*cb)(char*, size_t)) {
   return 0;
 }
 
-int rn2903_sys_ver(int fds) {
-  
+int rn2903_sys_get_ver(int fds, int (*cb)(char*, size_t)) {
+  char cmd[] = "sys get ver";
 
+  return rn2903_cmd(fds, cmd, sizeof(cmd), cb);
+}
+
+
+void (*rn2903_check_result_cb)(int) = NULL;
+
+int rn2903_check_result(char* res, size_t len) {
+  int ret;
+  int i;
+  const char expected[] = "RN2903";
+
+  if(!rn2903_check_result_cb) {
+    return 0;
+  }
+
+  ret = strncmp(res, expected, sizeof(expected));
+  if(ret != 0) {
+    ret = -1;
+  }
+
+  rn2903_check_result_cb(ret);  
   return 0;
 }
 
-int rn2903_receive(int fds, int fdi, char* data) {
+// Check if an RN2903 chip is connected
+// by sending "sys get var"
+// and expecting the response to begin with "RN2903".
+// Calls the callback with -1 if unexpected return value
+// or with 0 if success
+int rn2903_check(int fds, void (*cb)(int)) {
+  rn2903_check_result_cb = cb;
+  return rn2903_sys_get_ver(fds, rn2903_check_result);
+}
 
-  // TODO implement
+
+
+// check for CRLF
+ssize_t rn2903_handle_received(char* buf, size_t len) {
+  int i;
+  int found = 0;
+
+  for(i=0; i < len - 1; i++) {
+    if(buf[i] == '\r' && buf[i+1] == '\n') {
+      found = i + 2;
+    }
+  }
+  if(!found) {
+    return 0;
+  }
+
+  // call callback if set
+  if(recv_cb) {
+    recv_cb(rbuf, found);
+    recv_cb = NULL;
+  } else { // or call default handler
+    recv_cb_default(rbuf, found);
+  }
+
+  return found;
+}
+
+ssize_t rn2903_receive(int fds, int fdi) {
+
+  ssize_t ret;
+  ssize_t parsed;
+
+  while(1) {
+    ret = read(fds, rbuf + rbuf_len, RECEIVE_BUFFER_SIZE - rbuf_len);
+    if(ret < 0) {
+      if(errno == EAGAIN) {
+        return 0;
+      }
+      return ret;
+    }
+
+    if(ret == 0) {
+      return 0;
+    }
+
+    rbuf_len += ret;
+
+    parsed = rn2903_handle_received(rbuf, rbuf_len);
+    if(parsed > 0) {
+
+      // move remaining buffer data to beginning of buffer
+      memmove(rbuf, rbuf + parsed, rbuf_len - parsed);
+      rbuf_len -= parsed;
+    }
+
+    if(rbuf_len >= RECEIVE_BUFFER_SIZE) {
+      // TODO what do we do when we run out of buffer?
+      return -1;
+    }
+  }
+
 
   return 0;
 }
