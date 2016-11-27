@@ -88,9 +88,16 @@ int open_serial(char* dev, speed_t baud) {
   int fd;
 
   fd = open(dev, O_RDWR); /* connect to port */
+  if(fd < 0) {
+    fprintf(stderr, "Failed to open serial device %s: %s", dev, strerror(errno));
+    return fd;
+  }
   
   struct termios settings;
-  tcgetattr(fd, &settings);
+  if(tcgetattr(fd, &settings) < 0) {
+    fprintf(stderr, "Failed to get serial device %s attributes: %s", dev, strerror(errno));
+    return -1;
+  }
   
   cfsetospeed(&settings, baud); /* baud rate */
   settings.c_cflag &= ~PARENB; /* no parity */
@@ -100,7 +107,11 @@ int open_serial(char* dev, speed_t baud) {
   settings.c_lflag = ICANON; /* canonical mode */
   settings.c_oflag &= ~OPOST; /* raw output */
   
-  tcsetattr(fd, TCSANOW, &settings); /* apply the settings */
+  if(tcsetattr(fd, TCSANOW, &settings) < 0) {
+    fprintf(stderr, "Failed to set serial device %s attributes: %s", dev, strerror(errno));
+    return -1;
+  }
+  
   tcflush(fd, TCOFLUSH);
   
   return fd;
@@ -141,6 +152,9 @@ int event_loop(int fds, int fdi) {
 
     // handle incoming data on serial device
     if(FD_ISSET(fds, &fdset)) {
+      if(debug) {
+        printf("Got data on serial port\n");
+      }
       ret = rn2903_receive(fds, fdi);
       if(ret < 0) {
         return ret;
@@ -165,22 +179,34 @@ void usage(FILE* out, char* name) {
   fprintf(out, "Usage: %s\n", name);
 }
 
+void ping_report(int ret) {
+  if(ret < 0) {
+    printf("Got invalid response from RN2903\n");
+  } else {
+    printf("RN2903 is connected and responsive!\n");
+  }
+}
 
 int main(int argc, char* argv[]) {
   int opt;
 
-  char serial_dev[] = "/dev/ttyS0";
-  speed_t serial_speed = B9600;
+  char serial_dev[] = "/dev/ttyUSB0";
+  speed_t serial_speed = B57600;
   char iface_name[IFNAMSIZ] = "lora";
 
   int ret;
   int fds; // serial fd
   int fdi; // interface fd
 
+  int ping = 0;
+
   debug = 0;
 
-  while((opt = getopt(argc, argv, "d")) > 0) {
+  while((opt = getopt(argc, argv, "pd")) > 0) {
     switch(opt) {
+      case 'p':
+        ping = 1;
+        break;
       case 'd':
         debug = 1;
         break;
@@ -209,6 +235,13 @@ int main(int argc, char* argv[]) {
   }
 
   open_ipc_socket();
+
+  if(ping) {
+    if(debug) {
+      printf("Preparing to ping\n");
+    }
+    rn2903_check(fds, ping_report);
+  }
 
   ret = event_loop(fds, fdi);
   if(ret < 0) {

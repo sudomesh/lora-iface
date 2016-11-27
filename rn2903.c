@@ -6,8 +6,9 @@
 
 #include "rn2903.h"
 
-
 #define RECEIVE_BUFFER_SIZE 8192
+
+extern int debug;
 
 char rbuf[RECEIVE_BUFFER_SIZE];
 size_t rbuf_len = 0;
@@ -20,9 +21,9 @@ int recv_cb_default(char* buf, size_t len) {
 }
 
 int rn2903_cmd(int fds, char* buf, size_t len, int (*cb)(char*, size_t)) {
-  ssize_t sent;
+  ssize_t sent = 0;
   ssize_t ret;
-  const char crlf[] = "\r\n";
+  const char crlf[] = "\r\n\0";
 
   // TODO queue command if a command is already processing
   if(recv_cb) {
@@ -30,16 +31,22 @@ int rn2903_cmd(int fds, char* buf, size_t len, int (*cb)(char*, size_t)) {
   }
   recv_cb = cb;
 
-  char* to_send = malloc(len + 2);
+  char* to_send = malloc(len + 3);
   if(!to_send) {
     return -1;
   }
   memcpy(to_send, buf, len);
-  memcpy(to_send + len, crlf, 2);
+  memcpy(to_send + len, crlf, 3);
+  len += 2;
+
+  if(debug) {
+    printf("Sending: %s", to_send);
+  }
 
   while(sent < len) {
-    ret = send(fds, to_send + sent, len - sent, 0);
+    ret = write(fds, to_send + sent, len - sent);
     if(ret < 0) {
+      fprintf(stderr, "Error during send to serial: %s\n", strerror(errno));
       free(to_send);
       return ret;
     }
@@ -53,7 +60,7 @@ int rn2903_cmd(int fds, char* buf, size_t len, int (*cb)(char*, size_t)) {
 int rn2903_sys_get_ver(int fds, int (*cb)(char*, size_t)) {
   char cmd[] = "sys get ver";
 
-  return rn2903_cmd(fds, cmd, sizeof(cmd), cb);
+  return rn2903_cmd(fds, cmd, sizeof(cmd)-1, cb);
 }
 
 
@@ -68,7 +75,7 @@ int rn2903_check_result(char* res, size_t len) {
     return 0;
   }
 
-  ret = strncmp(res, expected, sizeof(expected));
+  ret = strncmp(res, expected, sizeof(expected)-1);
   if(ret != 0) {
     ret = -1;
   }
