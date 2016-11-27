@@ -139,15 +139,22 @@ int event_loop(int fds, int fdi) {
 
     handle_uclient_connections(&fdset);
 
-    // handle data on serial device
+    // handle incoming data on serial device
     if(FD_ISSET(fds, &fdset)) {
-      // TODO
+      
+      // TODO transmit on fdi
+
     }
 
-    
-    // handle data on network interface
+    // handle incoming data on network interface
     if(FD_ISSET(fdi, &fdset)) {
-      // TODO
+
+      // TODO receive data from fdi
+
+      //      ret = rn2903_transmit(fds, fdi, data);
+      if(ret < 0) {
+        return ret;
+      }
     }
   }
 }
