@@ -8,6 +8,6 @@ before_script:
   - sudo cmake CMakeLists.txt && sudo make
   - sudo cp *.a /usr/lib
 script: 
-  - mkdir test/build && cd test/build 
+  - mkdir $TRAVIS_BUILD_DIR/test/build && cd $TRAVIS_BUILD_DIR/test/build 
   - cmake .. && make 
   - ./runTests
