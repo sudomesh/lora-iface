@@ -3,4 +3,11 @@ before_install:
   - sudo apt-get -qq update 
   - sudo apt-get install -y cmake libgtest-dev
 language: cpp
-script: mkdir test/build && cd test/build && cmake .. && make && ./runTests
+before_script:
+  - cd /usr/src/gtest 
+  - sudo cmake CMakeLists.txt && sudo make
+  - sudo cp *.a /usr/lib
+script: 
+  - mkdir test/build && cd test/build 
+  - cmake .. && make 
+  - ./runTests
