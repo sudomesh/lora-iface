@@ -1,0 +1,1 @@
+script: mkdir testing/build && cd testing/build && cmake .. && make && ./runTests
