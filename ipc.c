@@ -16,7 +16,7 @@
 
 extern int debug;
 
-char* socket_file = "/tmp/lora_iface.sock";
+const char* socket_file = "/tmp/lora_iface.sock";
 
 struct uclient* uclients = NULL;
 int uclient_count = 0;
