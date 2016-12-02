@@ -1,2 +1,5 @@
+before-install:
+  - sudo apt-get -qq update 
+  - sudo apt-get install -y cmake gtest
 language: cpp
 script: mkdir test/build && cd test/build && cmake .. && make && ./runTests
