@@ -1,0 +1,15 @@
+sudo: required
+before_install:
+  - sudo apt-get -qq update 
+  - sudo apt-get install -y cmake libgtest-dev
+language: cpp
+before_script:
+  - cd /usr/src/gtest 
+  - sudo cmake CMakeLists.txt && sudo make
+  - sudo cp *.a /usr/lib
+script: 
+  - cd $TRAVIS_BUILD_DIR
+  - make
+  - mkdir test/build && cd test/build 
+  - cmake .. && make 
+  - ./runTests

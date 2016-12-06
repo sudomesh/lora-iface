@@ -16,7 +16,7 @@
 
 extern int debug;
 
-char* socket_file = "/tmp/lora_iface.sock";
+const char* socket_file = "/tmp/lora_iface.sock";
 
 struct uclient* uclients = NULL;
 int uclient_count = 0;
@@ -58,14 +58,14 @@ struct uclient* add_uclient(int fd) {
 
   struct uclient *cur;
 
-  struct uclient *ucl = malloc(sizeof(struct uclient));
+  struct uclient *ucl = (struct uclient *)malloc(sizeof(struct uclient));
   if(!ucl) {
     return NULL;
   }
   
   ucl->fd = fd;
   ucl->next = NULL;
-  ucl->msg = malloc(MAX_UCLIENT_MSG_SIZE+1);
+  ucl->msg = (char *)malloc(MAX_UCLIENT_MSG_SIZE+1);
   if(!(ucl->msg)) {
     return NULL;
   }
@@ -196,7 +196,7 @@ int send_uclient_msg(char cmd, char* arg, int get_response) {
     cmd_len = 2;
   }
 
-  full_cmd = malloc(cmd_len);
+  full_cmd = (char *)malloc(cmd_len);
   if(!full_cmd) {
     return -1;
   }
