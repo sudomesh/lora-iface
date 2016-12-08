@@ -6,6 +6,7 @@
 #include <netinet/ip.h>  
 
 TEST(IPPacketTest, ConfirmLittleEndian) {
+  //only passes on little endian machines
   int one = 1;
   char *ptr;
   ptr = (char *)&one;
@@ -37,7 +38,8 @@ TEST(IPPacketTest, ParsePacket) {
 
   // layer 2 - data link / ethernet
   struct ethhdr *ethernetHeader = (struct ethhdr*)pingRequest;
- 
+
+  ASSERT_EQ(14, sizeof(ethhdr)); 
   // source/ dest are media access control (mac) addresses (layer 1)  
   ASSERT_EQ(0x1b, ethernetHeader->h_source[5]);
   ASSERT_EQ(0x2d, ethernetHeader->h_dest[5]);
@@ -46,8 +48,11 @@ TEST(IPPacketTest, ParsePacket) {
   // layer 3 - network / internet protocol
   struct iphdr *ipHeader = (struct iphdr*)(pingRequest + sizeof(struct ethhdr));
   
+  int ipHeaderLength = ipHeader->ihl * 4;
   ASSERT_EQ(1, ipHeader->protocol);
-  
+  ASSERT_EQ(84, ntohs(ipHeader->tot_len));
+  ASSERT_EQ(20, ipHeaderLength); 
+ 
   struct sockaddr_in source;
   memset(&source, 0, sizeof(struct sockaddr_in));
   source.sin_addr.s_addr = ipHeader->saddr;
@@ -61,8 +66,9 @@ TEST(IPPacketTest, ParsePacket) {
   ASSERT_STREQ("172.217.5.78", ipDest);
 
   // layer 4 - protocol / internet control message protocol
-  unsigned short ipHeaderLength = sizeof(struct iphdr) + sizeof(struct ethhdr);
-  struct icmphdr *icmpHeader = (struct icmphdr*)(pingRequest + ipHeaderLength);
+  unsigned short icmpHeaderOffset = sizeof(struct ethhdr) + ipHeaderLength; 
+  struct icmphdr *icmpHeader = (struct icmphdr*)(pingRequest + icmpHeaderOffset);
 
+  ASSERT_EQ(8, sizeof(struct icmphdr));
   ASSERT_EQ(ICMP_ECHO, icmpHeader->type);
 }
