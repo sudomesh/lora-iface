@@ -75,13 +75,14 @@ int rn2903_transmit(int fds) {
   char* to_send;
   size_t to_send_len;
   ssize_t sent = 0;
+  int ret;
   const char crlf[] = "\r\n\0";
 
-  if(cur_cmd) {
-    cmd = cur_cmd;
+  if(cmd_cur) {
+    cmd = cmd_cur;
   } else if(cmd_queue) { // nothing currently processing so get next from queue
     cmd = cmd_queue;
-    cur_cmd = cmd;
+    cmd_cur = cmd;
     cmd_queue = cmd_queue->next;    
   } else {
     return 0; // nothing to do
@@ -119,7 +120,7 @@ int rn2903_cmd(int fds, char* buf, size_t len, int (*cb)(char*, size_t)) {
   command* cmd;
   ssize_t sent = 0;
   const char crlf[] = "\r\n\0";
-
+  char* cmd_str;
 
   cmd = malloc(sizeof(command));
   cmd_str = buf;
@@ -250,9 +251,3 @@ ssize_t rn2903_receive(int fds, int fdi) {
   return 0;
 }
 
-int rn2903_transmit(int fds, int fdi, char* data) {
-
-  // TODO implement
-
-  return 0;
-}
