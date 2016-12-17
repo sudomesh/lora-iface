@@ -3,12 +3,25 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <time.h>
 
 #include "rn2903.h"
 
 #define RECEIVE_BUFFER_SIZE 8192
 
+typedef struct command {
+  char* buf;
+  size_t len;
+  int (*cb)(char*, size_t);
+  int retries;
+  struct timespec last_attempt;
+  struct command* next; 
+} command;
+
 extern int debug;
+
+command* cmd_queue = NULL;
+command* cmd_cur = NULL; // cmd that has been sent but no response received yet
 
 char rbuf[RECEIVE_BUFFER_SIZE];
 size_t rbuf_len = 0;
@@ -20,31 +33,74 @@ int recv_cb_default(char* buf, size_t len) {
   return 0;
 }
 
-int rn2903_cmd(int fds, char* buf, size_t len, int (*cb)(char*, size_t)) {
+
+command* queue_cmd(char* buf, size_t len, int (*cb)(char*, size_t)) {
+  command* cur;
+  command* cmd = malloc(sizeof(command));
+
+  if(!cmd) {
+    return NULL;
+  }
+
+  if(len < 1) {
+    return 0;
+  }
+
+  if(!cb) {
+    return NULL;
+  }
+
+  cmd->buf = buf;
+  cmd->len = len;
+  cmd->cb = cb;
+  cmd->retries = 0;
+  cmd->next = NULL;
+
+  if(!cmd_queue) {
+    cmd_queue = cmd;
+  } else {
+    // find last command in queue
+    cur = cmd_queue;
+    while(cur->next) {
+      cur = cur->next;
+    }
+    cur->next - cmd;
+  }
+}
+
+
+// send whatever is ready for sending
+int rn2903_transmit(int fds) {
+  command* cmd;
+  char* to_send;
+  size_t to_send_len;
   ssize_t sent = 0;
-  ssize_t ret;
   const char crlf[] = "\r\n\0";
 
-  // TODO queue command if a command is already processing
-  if(recv_cb) {
-    return -1;
+  if(cur_cmd) {
+    cmd = cur_cmd;
+  } else if(cmd_queue) { // nothing currently processing so get next from queue
+    cmd = cmd_queue;
+    cur_cmd = cmd;
+    cmd_queue = cmd_queue->next;    
+  } else {
+    return 0; // nothing to do
   }
-  recv_cb = cb;
 
-  char* to_send = malloc(len + 3);
+  to_send = malloc(cmd->len + 3);
   if(!to_send) {
     return -1;
   }
-  memcpy(to_send, buf, len);
-  memcpy(to_send + len, crlf, 3);
-  len += 2;
+  memcpy(to_send, cmd->buf, cmd->len);
+  memcpy(to_send + cmd->len, crlf, 3);
+  to_send_len = cmd->len + 2;
 
   if(debug) {
     printf("Sending: %s", to_send);
   }
 
-  while(sent < len) {
-    ret = write(fds, to_send + sent, len - sent);
+  while(sent < to_send_len) {
+    ret = write(fds, to_send + sent, cmd->len - sent);
     if(ret < 0) {
       fprintf(stderr, "Error during send to serial: %s\n", strerror(errno));
       free(to_send);
@@ -54,6 +110,41 @@ int rn2903_cmd(int fds, char* buf, size_t len, int (*cb)(char*, size_t)) {
   }
 
   free(to_send);
+}
+
+
+int rn2903_cmd(int fds, char* buf, size_t len, int (*cb)(char*, size_t)) {
+  ssize_t ret;
+  command* cur;
+  command* cmd;
+  ssize_t sent = 0;
+  const char crlf[] = "\r\n\0";
+
+
+  cmd = malloc(sizeof(command));
+  cmd_str = buf;
+  cmd->cb = cb;
+  cmd->retries = 0;
+  cmd->next = NULL;
+
+  // if we're currently waiting for a response for
+  // the previously sent command
+  if(cmd_cur) {
+    // if there is no queue, create it
+    if(!cmd_queue) {
+      cmd_queue = cmd;
+    } else { 
+      // find last command in queue and append cmd
+      cur = cmd_queue;
+      while(cur->next) {
+        cur = cur->next;
+      }
+      cur->next = cmd;
+    }
+  } else { // we're ready to transmit
+
+  }
+
   return 0;
 }
 

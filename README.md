@@ -9,6 +9,6 @@ Currently only the Microchip RN2903 is supported.
 
 # Copyright and license
 
-Copyright 2016 Marc Juul
+Copyright 2016 Marc Juul and Jorrit Poelen
 
 License: GPLv3
