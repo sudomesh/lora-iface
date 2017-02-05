@@ -14,6 +14,7 @@
 #include <linux/if_tun.h>
 
 #define TX_QUEUE_LENGTH (20)
+#define LORA_MTU (500)
 
 int debug;
 
@@ -97,6 +98,7 @@ int set_txqueuelen(char* ifname, int num_packets) {
 
   ifr.ifr_addr.sa_family = AF_INET;
   strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+
   ifr.ifr_qlen = num_packets;
 
   ioctl(fd, SIOCSIFTXQLEN, (caddr_t) &ifr);
@@ -110,27 +112,58 @@ int set_txqueuelen(char* ifname, int num_packets) {
   return 0;
 }
 
-int set_mtu(int mtu) {
+// get mtu for interface
+int get_mtu(char* ifname) {
 
-  /*
   struct ifreq ifr; 
-  int sock;
+  int fd;
+  int ret;
   
-  if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+  if((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
     return -1;
   }
-  
-  
+
   ifr.ifr_addr.sa_family = AF_INET;
-  strncpy(ifr.ifr_name, iap->ifa_name, sizeof(ifr.ifr_name));
+  strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+
+  ioctl(fd, SIOCGIFMTU, (caddr_t) &ifr);
+  if(ret < 0) {
+    perror("Error during SIOCGIFMTU ioctl (get mtu)");
+    close(fd);
+    return -1;
+  }
+
+  close(fd);
+  return ifr.ifr_mtu;
+}
+
+// set mtu for interface
+int set_mtu(char* ifname, int mtu) {
+
+  struct ifreq ifr; 
+  int fd;
+  int ret;
+  
+  if((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    return -1;
+  }
+
+  ifr.ifr_addr.sa_family = AF_INET;
+  strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
 
   ifr.ifr_mtu = mtu; 
 
-  ioctl(s, SIOCSIFMTU, (caddr_t)&ifr);
+  ioctl(fd, SIOCSIFMTU, (caddr_t) &ifr);
+  if(ret < 0) {
+    perror("Error during SIOCSIFMTU ioctl (set mtu)");
+    close(fd);
+    return -1;
+  }
 
-  close(sock);
-  */
+  close(fd);
+  return 0;
 }
+
 
 // baud is specified using macros
 // e.g. 9600 is B9600
@@ -292,7 +325,11 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  printf("txqueuelen: %d\n", ret);
+  ret = set_mtu(iface_name, LORA_MTU);
+  if(ret < 0) {
+    fprintf(stderr, "Unable to set MTU for %s interface to %d\n", iface_name, LORA_MTU);
+    return 1;
+  }
 
   open_ipc_socket();
 
