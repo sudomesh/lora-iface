@@ -13,6 +13,7 @@
 #include <linux/if.h>
 #include <linux/if_tun.h>
 
+#define TX_QUEUE_LENGTH (20)
 
 int debug;
 
@@ -58,6 +59,56 @@ int create_tun(char* dev) {
   return fd;
 }
 
+
+int get_txqueuelen(char* ifname) {
+
+  struct ifreq ifr; 
+  int fd;
+  int ret;
+  
+  if((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    return -1;
+  }
+
+  ifr.ifr_addr.sa_family = AF_INET;
+  strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+
+  ioctl(fd, SIOCGIFTXQLEN, (caddr_t) &ifr);
+  if(ret < 0) {
+    perror("Error during SIOCGIFTXQLEN ioctl (get txqueuelen)");
+    close(fd);
+    return -1;
+  }
+
+  close(fd);
+  return ifr.ifr_qlen;
+}
+
+// set transmit queue length (txqueuelen) for interface
+int set_txqueuelen(char* ifname, int num_packets) {
+
+  struct ifreq ifr; 
+  int fd;
+  int ret;
+  
+  if((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    return -1;
+  }
+
+  ifr.ifr_addr.sa_family = AF_INET;
+  strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+  ifr.ifr_qlen = num_packets;
+
+  ioctl(fd, SIOCSIFTXQLEN, (caddr_t) &ifr);
+  if(ret < 0) {
+    perror("Error during SIOCSIFTXQLEN ioctl (set txqueuelen)");
+    close(fd);
+    return -1;
+  }
+
+  close(fd);
+  return 0;
+}
 
 int set_mtu(int mtu) {
 
@@ -192,7 +243,7 @@ int main(int argc, char* argv[]) {
 
   char serial_dev[] = "/dev/ttyUSB0";
   speed_t serial_speed = B57600;
-  char iface_name[IFNAMSIZ] = "lora";
+  char iface_name[IFNAMSIZ] = "lora0";
 
   int ret;
   int fds; // serial fd
@@ -223,6 +274,7 @@ int main(int argc, char* argv[]) {
   // and call send_uclient_msg accordingly
   //ret = send_uclient_msg('i', NULL, 1);
 
+
   fds = open_serial(serial_dev, serial_speed);
   if(fds < 0) {
     return fds;
@@ -233,6 +285,14 @@ int main(int argc, char* argv[]) {
     close(fds);
     return fdi;
   }
+
+  ret = set_txqueuelen(iface_name, TX_QUEUE_LENGTH);
+  if(ret < 0) {
+    fprintf(stderr, "Unable to set txqueuelen (transmit queue length) for %s interface to %d\n", iface_name, TX_QUEUE_LENGTH);
+    return 1;
+  }
+
+  printf("txqueuelen: %d\n", ret);
 
   open_ipc_socket();
 
