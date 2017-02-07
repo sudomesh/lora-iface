@@ -20,7 +20,6 @@ typedef struct command {
 
 extern int debug;
 
-command* cmd_queue = NULL;
 command* cmd_cur = NULL; // cmd that has been sent but no response received yet
 
 char rbuf[RECEIVE_BUFFER_SIZE];
@@ -33,42 +32,6 @@ int recv_cb_default(char* buf, size_t len) {
   return 0;
 }
 
-
-command* queue_cmd(char* buf, size_t len, int (*cb)(char*, size_t)) {
-  command* cur;
-  command* cmd = malloc(sizeof(command));
-
-  if(!cmd) {
-    return NULL;
-  }
-
-  if(len < 1) {
-    return 0;
-  }
-
-  if(!cb) {
-    return NULL;
-  }
-
-  cmd->buf = buf;
-  cmd->len = len;
-  cmd->cb = cb;
-  cmd->retries = 0;
-  cmd->next = NULL;
-
-  if(!cmd_queue) {
-    cmd_queue = cmd;
-  } else {
-    // find last command in queue
-    cur = cmd_queue;
-    while(cur->next) {
-      cur = cur->next;
-    }
-    cur->next - cmd;
-  }
-}
-
-
 // send whatever is ready for sending
 int rn2903_transmit(int fds) {
   command* cmd;
@@ -80,11 +43,6 @@ int rn2903_transmit(int fds) {
 
   if(cmd_cur) {
     cmd = cmd_cur;
-  } else if(cmd_queue) { // nothing currently processing so get next from queue
-    cmd = cmd_queue;
-    cmd_cur = cmd;
-    cmd_queue = cmd_queue->next;    
-  } else {
     return 0; // nothing to do
   }
 
@@ -110,6 +68,7 @@ int rn2903_transmit(int fds) {
     sent += ret;
   }
 
+  cmd_cur = NULL;
   free(to_send);
 }
 
@@ -128,6 +87,7 @@ int rn2903_cmd(int fds, char* buf, size_t len, int (*cb)(char*, size_t)) {
   cmd->retries = 0;
   cmd->next = NULL;
 
+  /*
   // if we're currently waiting for a response for
   // the previously sent command
   if(cmd_cur) {
@@ -145,7 +105,7 @@ int rn2903_cmd(int fds, char* buf, size_t len, int (*cb)(char*, size_t)) {
   } else { // we're ready to transmit
 
   }
-
+  */
   return 0;
 }
 

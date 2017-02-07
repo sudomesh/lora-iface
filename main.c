@@ -6,17 +6,69 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <termios.h>
+#include <grp.h>
+#include <pwd.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#include <sys/types.h>
 #include <sys/time.h>
 #include <linux/if.h>
 #include <linux/if_tun.h>
+
+// group and user to run this program as
+#define RUNAS_GROUP "juul"
+#define RUNAS_USER "juul"
 
 #define TX_QUEUE_LENGTH (20)
 #define LORA_MTU (500)
 
 int debug;
+
+// drop root privileges
+int drop_privs(char* group_name, char* user_name) {
+  struct passwd *pwd;
+  struct group *grp;
+  gid_t group_id;
+  uid_t user_id;
+
+  if(getuid() != 0) { 
+    return -1;
+  }
+
+  // DO NOT FREE grp (see man getgrnam)
+  grp = getgrnam(group_name);
+  if(grp == NULL) {
+    perror("could not find group id from group name");
+    return -1;
+  }
+
+  group_id = grp->gr_gid;
+  grp = NULL;
+
+  // DO NOT FREE pwd (see man getpwnam)
+  pwd = getpwnam(user_name);
+  if(pwd == NULL) {
+    perror("could not find user id from user name");
+    return -1;
+  }
+
+  user_id = pwd->pw_uid;
+  pwd = NULL;
+
+  if(setgid(group_id) != 0) {
+    perror("unable to drop group privilege from root");
+    return -1;
+  }
+
+
+  if(setuid(user_id) != 0) {
+    perror("unable to drop user privilege from root");
+    return -1;    
+  }
+
+  return 0;
+}
 
 // either call with a pre-allocated 
 //   char dev[IFNAMSIZ]
@@ -173,13 +225,13 @@ int open_serial(char* dev, speed_t baud) {
 
   fd = open(dev, O_RDWR); /* connect to port */
   if(fd < 0) {
-    fprintf(stderr, "Failed to open serial device %s: %s", dev, strerror(errno));
+    fprintf(stderr, "Failed to open serial device %s: %s\n", dev, strerror(errno));
     return fd;
   }
   
   struct termios settings;
   if(tcgetattr(fd, &settings) < 0) {
-    fprintf(stderr, "Failed to get serial device %s attributes: %s", dev, strerror(errno));
+    fprintf(stderr, "Failed to get serial device %s attributes: %s\n", dev, strerror(errno));
     return -1;
   }
   
@@ -192,7 +244,7 @@ int open_serial(char* dev, speed_t baud) {
   settings.c_oflag &= ~OPOST; /* raw output */
   
   if(tcsetattr(fd, TCSANOW, &settings) < 0) {
-    fprintf(stderr, "Failed to set serial device %s attributes: %s", dev, strerror(errno));
+    fprintf(stderr, "Failed to set serial device %s attributes: %s\n", dev, strerror(errno));
     return -1;
   }
   
@@ -307,7 +359,6 @@ int main(int argc, char* argv[]) {
   // and call send_uclient_msg accordingly
   //ret = send_uclient_msg('i', NULL, 1);
 
-
   fds = open_serial(serial_dev, serial_speed);
   if(fds < 0) {
     return fds;
@@ -319,18 +370,28 @@ int main(int argc, char* argv[]) {
     return fdi;
   }
 
+  // Set transmit queue length for TUN interface
   ret = set_txqueuelen(iface_name, TX_QUEUE_LENGTH);
   if(ret < 0) {
     fprintf(stderr, "Unable to set txqueuelen (transmit queue length) for %s interface to %d\n", iface_name, TX_QUEUE_LENGTH);
     return 1;
   }
 
+  // Set MTU for TUN interface
   ret = set_mtu(iface_name, LORA_MTU);
   if(ret < 0) {
     fprintf(stderr, "Unable to set MTU for %s interface to %d\n", iface_name, LORA_MTU);
     return 1;
   }
 
+  // drop root privileges
+  ret = drop_privs(RUNAS_GROUP, RUNAS_USER);
+  if(ret < 0) {
+    fprintf(stderr, "Failed to drop root privileges.\n");
+    return 1;
+  }
+
+  // socket for talking to the running daemon
   open_ipc_socket();
 
   if(ping) {
