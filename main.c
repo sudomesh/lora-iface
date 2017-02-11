@@ -61,7 +61,6 @@ int drop_privs(char* group_name, char* user_name) {
     return -1;
   }
 
-
   if(setuid(user_id) != 0) {
     perror("unable to drop user privilege from root");
     return -1;    
@@ -258,10 +257,27 @@ int close_serial(int fd) {
 }
 
 
+int receive_done(int fds, char* recvd, size_t size) {
+
+  // TODO
+  // 
+  // 1. If recvd not NULL (something was received)
+  //    Send it to TUN interface (fdi)
+  // 2. Have another select call in here
+  //    to check if there is anything to transmit
+  //    Then transmit it. 
+  //    Then run rn2903_rx again once transmission is done.
+}
+
 int event_loop(int fds, int fdi) {
   int ret;
   int maxfd;
   fd_set fdset;
+
+  ret = rn2903_rx(fds, fdi, RECEIVE_TIME, receive_done);
+  if(ret < 0) {
+    return ret;
+  }
 
   while(1) {
     
@@ -291,7 +307,7 @@ int event_loop(int fds, int fdi) {
       if(debug) {
         printf("Got data on serial port\n");
       }
-      ret = rn2903_receive(fds, fdi);
+      ret = rn2903_read(fds, fdi);
       if(ret < 0) {
         return ret;
       }
@@ -301,6 +317,7 @@ int event_loop(int fds, int fdi) {
     if(FD_ISSET(fdi, &fdset)) {
 
       // TODO receive data from fdi
+      // TODO parse IP header and ensure that we send only whole packets
 
       //      ret = rn2903_transmit(fds, fdi, data);
       if(ret < 0) {

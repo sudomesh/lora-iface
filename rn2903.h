@@ -4,6 +4,7 @@ int rn2903_check();
 
 int rn2903_cmd(int fds, char* buf, size_t len, int (*cb)(char*, size_t));
 
-ssize_t rn2903_receive(int fds, int fdi);
+// read received data from rn2903 via serial
+ssize_t rn2903_read(int fds, int fdi);
 
-int rn2903_transmit(int fds);
+ssize_t rn2903_transmit(int fds);

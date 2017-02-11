@@ -44,7 +44,9 @@ Several queuing disciplines completely ignore txqueuelen, but pfifo_fast, the de
 tc qdisc show dev lora0
 ```
 
-SIOCGIFTXQLEN
+# ToDo
+
+It might be nice to have an option for running in layer 4 mode where the IP header is stripped to save space and all received data then has a fake IP header added which makes it seem like the data was a broadcast packet.
 
 # Copyright and license
 
