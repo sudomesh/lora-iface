@@ -129,6 +129,18 @@ int equals(char* a, const char* b) {
   return 0;
 }
 
+int rn2903_rx_result2(int fds, char* buf, size_t size) {
+
+  if(equals(buf, "radio_err")) { // reception timeout
+    return finalize_cmd(fds, NULL, 0);
+  } else if (equals(buf, "radio_rx ")) {
+    return finalize_cmd(fds, buf + 9, size - 9);
+  } else {
+    fprintf(stderr, "Invalid response from rn2903\n");
+    return -1;
+  }
+}
+
 int rn2903_rx_result(int fds, char* buf, size_t size) {
 
   if(equals(buf, "ok")) {
@@ -147,18 +159,6 @@ int rn2903_rx_result(int fds, char* buf, size_t size) {
   }
 }
 
-int rn2903_rx_result2(int fds, char* buf, size_t size) {
-
-  if(equals(buf, "radio_err")) { // reception timeout
-    return finalize_cmd(fds, NULL, 0);
-  } else if (equals(buf, "radio_rx ")) {
-    return finalize_cmd(fds, buf + 9, size - 9);
-  } else {
-    fprintf(stderr, "Invalid response from rn2903\n");
-    return -1;
-  }
-}
-
 // send the "radio rx" command
 int rn2903_rx(int fds, unsigned int rx_window_size, int (*cb)(int, char*, size_t)) {
   char cmd[16];
@@ -166,7 +166,7 @@ int rn2903_rx(int fds, unsigned int rx_window_size, int (*cb)(int, char*, size_t
     fprintf(stderr, "rx_windows_size must be between 0 and 65535\n");
     return -1;
   }
-  snprintf(cmd, "radio rx %ud\n", 15, rx_window_size);
+  snprintf(cmd, 15, "radio rx %ud\n", rx_window_size);
   cmd[15] = '\0'; // just in case
 
   recv_cb = rn2903_rx_result;
@@ -174,12 +174,6 @@ int rn2903_rx(int fds, unsigned int rx_window_size, int (*cb)(int, char*, size_t
   return rn2903_cmd(fds, cmd, strlen(cmd), cb);
 }
 
-
-int rn2903_sys_get_ver(int fds, int (*cb)(int, char*, size_t)) {
-  char cmd[] = "sys get ver";
-
-  return rn2903_cmd(fds, cmd, sizeof(cmd)-1, cb);
-}
 
 
 int rn2903_check_result(int fds, char* res, size_t len) {
@@ -190,7 +184,7 @@ int rn2903_check_result(int fds, char* res, size_t len) {
   ret = strncmp(res, expected, sizeof(expected)-1);
   if(ret != 0) {
     fprintf(stderr, "Unexpected result from cmd \"sys get var\"\n");
-    ret = -1;
+    return finalize_cmd(fds, NULL, 0);
   }
 
   return finalize_cmd(fds, res, len);
@@ -201,7 +195,7 @@ int rn2903_check_result(int fds, char* res, size_t len) {
 // and expecting the response to begin with "RN2903".
 // Calls the callback with -1 if unexpected return value
 // or with 0 if success
-int rn2903_check(int fds, void (*cb)(int)) {
+int rn2903_check(int fds, int (*cb)(int, char*, size_t)) {
   recv_cb = rn2903_check_result;
   return rn2903_sys_get_ver(fds, cb);
 }

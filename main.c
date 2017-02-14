@@ -23,6 +23,8 @@
 #define TX_QUEUE_LENGTH (20)
 #define LORA_MTU (500)
 
+#define RECEIVE_TIME 100
+
 int debug;
 
 // drop root privileges
@@ -332,8 +334,8 @@ void usage(FILE* out, char* name) {
   fprintf(out, "Usage: %s\n", name);
 }
 
-void ping_report(int ret) {
-  if(ret < 0) {
+void ping_report(int fds, char* buf, size_t len) {
+  if(!buf) {
     printf("Got invalid response from RN2903\n");
   } else {
     printf("RN2903 is connected and responsive!\n");
